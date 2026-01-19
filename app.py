@@ -9,7 +9,6 @@ import streamlit as st
 from datetime import date, timedelta
 import yfinance as yf
 from prophet import Prophet
-from prophet.plot import plot_plotly
 from plotly import graph_objs as go
 import pandas as pd
 
@@ -22,7 +21,7 @@ st.set_page_config(
 
 st.title('📈 Dashboard Financiero con Predicción AI')
 
-# 2. Sidebar: Parámetros del usuario
+# 2. Sidebar
 st.sidebar.header("Configuración")
 selected_stock = st.sidebar.text_input("Símbolo (Ticker)", "AAPL")
 
@@ -39,7 +38,6 @@ start_date_str = start_date.strftime("%Y-%m-%d")
 # 4. Función de Carga de datos
 @st.cache_data
 def load_data(ticker, start):
-    """Descarga y limpia los datos de Yahoo Finance."""
     try:
         df = yf.download(ticker, start=start, end=date.today().strftime("%Y-%m-%d"))
         
@@ -53,6 +51,9 @@ def load_data(ticker, start):
 
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
+        
+        # Ordenamos los datos por fecha 
+        df = df.sort_values('Date')
 
         return df
     except Exception as e:
@@ -68,31 +69,31 @@ data_load_state.text('¡Datos cargados!')
 if data.empty:
     st.error(f"⚠️ No se encontraron datos para '{selected_stock}'.")
 else:
-    # --- SECCIÓN 1: DATOS HISTÓRICOS  ---
+    # --- SECCIÓN 1: DATOS HISTÓRICOS (GRÁFICO AZUL) ---
     st.subheader(f'Datos Históricos ({n_years} años)')
     
     # Tabla con scroll
     st.dataframe(data, height=200, use_container_width=True)
 
-    # GRÁFICA HISTÓRICA 
-    def plot_raw_data():
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=data['Date'], 
-            y=data['Close'], 
-            name="Precio Cierre",
-            line=dict(color='blue')
-        ))
-        fig.layout.update(
-            title_text=f'Evolución Histórica: {selected_stock}', 
-            xaxis_rangeslider_visible=True,
-            hovermode="x unified"
-        )
-        st.plotly_chart(fig, use_container_width=True)
+    # GRÁFICA AZUL 
+    st.write("Generando gráfico histórico...") 
+    
+    fig_hist = go.Figure()
+    fig_hist.add_trace(go.Scatter(
+        x=data['Date'], 
+        y=data['Close'], 
+        name="Precio Cierre",
+        line=dict(color='blue')
+    ))
+    fig_hist.layout.update(
+        title_text=f'Evolución Histórica: {selected_stock}', 
+        xaxis_rangeslider_visible=True,
+        hovermode="x unified"
+    )
+    st.plotly_chart(fig_hist, use_container_width=True)
         
-    plot_raw_data()
 
-    # --- SECCIÓN 2: PREDICCIÓN  ---
+    # --- SECCIÓN 2: PREDICCIÓN (GRÁFICO ROJO) ---
     st.markdown("---") 
     st.subheader(f'🔮 Predicción de Precio a {prediction_months} meses')
 
@@ -113,36 +114,36 @@ else:
             st.write("Datos de la proyección futura:")
             st.dataframe(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(prediction_months*30), height=200)
 
-            # GRÁFICA DE PREDICCIÓN (Solo Futuro)
-            fig_custom = go.Figure()
+            # GRÁFICA ROJA (Solo futuro)
+            fig_pred = go.Figure()
 
             last_real_date = data['Date'].max()
             future_only = forecast[forecast['ds'] > last_real_date]
 
-            fig_custom.add_trace(go.Scatter(
+            fig_pred.add_trace(go.Scatter(
                 x=future_only['ds'],
                 y=future_only['yhat'],
                 name="Tendencia Futura",
                 line=dict(color='#ff2b2b', width=4) 
             ))
 
-            fig_custom.add_trace(go.Scatter(
+            fig_pred.add_trace(go.Scatter(
                 x=future_only['ds'], y=future_only['yhat_upper'],
                 mode='lines', line=dict(width=0), showlegend=False, hoverinfo='skip'
             ))
             
-            fig_custom.add_trace(go.Scatter(
+            fig_pred.add_trace(go.Scatter(
                 x=future_only['ds'], y=future_only['yhat_lower'],
                 fill='tonexty', mode='lines', line=dict(width=0),
                 fillcolor='rgba(255, 43, 43, 0.2)', 
                 showlegend=False, hoverinfo='skip'
             ))
 
-            fig_custom.update_layout(
+            fig_pred.update_layout(
                 title=f"Proyección Futura Exclusiva: {selected_stock}",
                 xaxis_title="Fecha Futura",
                 yaxis_title="Precio Estimado (USD)",
                 hovermode="x unified"
             )
 
-            st.plotly_chart(fig_custom, use_container_width=True)
+            st.plotly_chart(fig_pred, use_container_width=True)
