@@ -19,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title('🇪🇺 AI Stock Vision: Análisis en Euros')
+st.title(' AI Stock Vision: Análisis en Euros')
 
 # --- BASE DE DATOS DE TICKERS ---
 STOCK_DB = {
