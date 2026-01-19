@@ -125,30 +125,30 @@ else:
                 last_real_date = data['Date'].max()
                 future_only = forecast[forecast['ds'] > last_real_date]
 
-                # 1. Línea Principal (Predicción Central)
+                # 1. Línea Principal 
                 fig_pred.add_trace(go.Scatter(
                     x=future_only['ds'], y=future_only['yhat'], 
                     name="Predicción (Promedio)",
-                    line=dict(color='#FF4B4B', width=4) # Línea gruesa roja
+                    line=dict(color='#FF4B4B', width=4) 
                 ))
 
-                # 2. Límite Superior (Máximo visible)
+                # 2. Límite Superior 
                 fig_pred.add_trace(go.Scatter(
                     x=future_only['ds'], y=future_only['yhat_upper'],
                     name="Máximo Estimado",
                     mode='lines', 
-                    line=dict(width=1, color='rgba(255, 75, 75, 0.5)', dash='dot'), # Punteada visible
+                    line=dict(width=1, color='rgba(255, 75, 75, 0.5)', dash='dot'), 
                     showlegend=True
                 ))
 
-                # 3. Límite Inferior (Mínimo visible + Sombra)
+                # 3. Límite Inferior 
                 fig_pred.add_trace(go.Scatter(
                     x=future_only['ds'], y=future_only['yhat_lower'],
                     name="Mínimo Estimado",
                     mode='lines', 
-                    line=dict(width=1, color='rgba(255, 75, 75, 0.5)', dash='dot'), # Punteada visible
-                    fill='tonexty', # Esto rellena hasta la traza anterior (el máximo)
-                    fillcolor='rgba(255, 75, 75, 0.2)', # Sombra roja suave
+                    line=dict(width=1, color='rgba(255, 75, 75, 0.5)', dash='dot'), 
+                    fill='tonexty', 
+                    fillcolor='rgba(255, 75, 75, 0.2)', 
                     showlegend=True
                 ))
 
