@@ -123,9 +123,9 @@ else:
         df_train = df_train.rename(columns={"Date": "ds", "Close": "y"})
 
         if len(df_train) < 20:
-            st.warning("⚠️ Datos insuficientes para predecir.")
+            st.warning(" Datos insuficientes para predecir.")
         else:
-            with st.spinner('🤖 La IA está analizando tendencias...'):
+            with st.spinner(' La IA está analizando tendencias...'):
                 m = Prophet()
                 m.fit(df_train)
                 future = m.make_future_dataframe(periods=prediction_months * 30)
@@ -165,14 +165,14 @@ else:
                 # Análisis de tendencia simple
                 start_pred = future_only['yhat'].iloc[0]
                 end_pred = future_only['yhat'].iloc[-1]
-                trend = "ALCISTA 🚀" if end_pred > start_pred else "BAJISTA 🔻"
+                trend = "ALCISTA " if end_pred > start_pred else "BAJISTA "
                 
                 st.info(f"Tendencia proyectada: **{trend}** (Basado en análisis de estacionalidad)")
 
                 # Botón de descarga CSV
                 csv = future_only[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].to_csv(index=False).encode('utf-8')
                 st.download_button(
-                    label="📥 Descargar Predicción (CSV)",
+                    label=" Descargar Predicción (CSV)",
                     data=csv,
                     file_name=f'prediccion_{selected_stock}.csv',
                     mime='text/csv',
