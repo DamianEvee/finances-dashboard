@@ -26,10 +26,10 @@ st.title('📈 Dashboard Financiero con Predicción AI')
 st.sidebar.header("Configuración")
 selected_stock = st.sidebar.text_input("Símbolo (Ticker)", "AAPL")
 
-# --- CORRECCIÓN 1: Aumentado el límite a 10 años ---
+# Slider 1: Historia (hasta 10 años)
 n_years = st.sidebar.slider('Años de historia para entrenar:', 1, 10, 5)
 
-# Slider 2: Cuánto FUTURO predecir
+# Slider 2: Futuro
 prediction_months = st.sidebar.slider('Meses a predecir:', 1, 24, 12)
 
 # 3. Calcular fecha de inicio dinámica
@@ -68,12 +68,32 @@ data_load_state.text('¡Datos cargados!')
 if data.empty:
     st.error(f"⚠️ No se encontraron datos para '{selected_stock}'.")
 else:
-    # --- CORRECCIÓN 2: Tabla interactiva en vez de estática ---
+    # --- SECCIÓN 1: DATOS HISTÓRICOS  ---
     st.subheader(f'Datos Históricos ({n_years} años)')
-    st.caption("Usa el scroll en la tabla para ver los datos antiguos.")
-    st.dataframe(data, height=300, use_container_width=True)
+    
+    # Tabla con scroll
+    st.dataframe(data, height=200, use_container_width=True)
 
-    # --- PREDICCIÓN CON MACHINE LEARNING ---
+    # GRÁFICA HISTÓRICA 
+    def plot_raw_data():
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=data['Date'], 
+            y=data['Close'], 
+            name="Precio Cierre",
+            line=dict(color='blue')
+        ))
+        fig.layout.update(
+            title_text=f'Evolución Histórica: {selected_stock}', 
+            xaxis_rangeslider_visible=True,
+            hovermode="x unified"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+    plot_raw_data()
+
+    # --- SECCIÓN 2: PREDICCIÓN  ---
+    st.markdown("---") 
     st.subheader(f'🔮 Predicción de Precio a {prediction_months} meses')
 
     df_train = data[['Date', 'Close']].copy()
@@ -89,18 +109,16 @@ else:
             future = m.make_future_dataframe(periods=prediction_months * 30)
             forecast = m.predict(future)
 
-            # Mostrar tabla de predicciones (Interactivo también)
+            # Tabla de predicción
             st.write("Datos de la proyección futura:")
             st.dataframe(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(prediction_months*30), height=200)
 
-            # --- CORRECCIÓN 3: Gráfico SOLO PREDICCIÓN ---
+            # GRÁFICA DE PREDICCIÓN (Solo Futuro)
             fig_custom = go.Figure()
 
-            # Calculamos dónde empieza el futuro para pintar solo desde ahí
             last_real_date = data['Date'].max()
             future_only = forecast[forecast['ds'] > last_real_date]
 
-            # Línea de Predicción (Roja)
             fig_custom.add_trace(go.Scatter(
                 x=future_only['ds'],
                 y=future_only['yhat'],
@@ -108,17 +126,15 @@ else:
                 line=dict(color='#ff2b2b', width=4) 
             ))
 
-            # Intervalo de Confianza Superior
             fig_custom.add_trace(go.Scatter(
                 x=future_only['ds'], y=future_only['yhat_upper'],
                 mode='lines', line=dict(width=0), showlegend=False, hoverinfo='skip'
             ))
             
-            # Intervalo de Confianza Inferior 
             fig_custom.add_trace(go.Scatter(
                 x=future_only['ds'], y=future_only['yhat_lower'],
                 fill='tonexty', mode='lines', line=dict(width=0),
-                fillcolor='rgba(255, 43, 43, 0.2)',
+                fillcolor='rgba(255, 43, 43, 0.2)', 
                 showlegend=False, hoverinfo='skip'
             ))
 
@@ -126,8 +142,7 @@ else:
                 title=f"Proyección Futura Exclusiva: {selected_stock}",
                 xaxis_title="Fecha Futura",
                 yaxis_title="Precio Estimado (USD)",
-                hovermode="x unified",
-                showlegend=True
+                hovermode="x unified"
             )
 
             st.plotly_chart(fig_custom, use_container_width=True)
