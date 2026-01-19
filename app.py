@@ -1,8 +1,9 @@
 """
-Dashboard Financiero Profesional
+Dashboard Financiero Profesional v3.0 (Clean Version)
 -----------------------------------------
 Autor: Evee_
 Tech Stack: Streamlit, Yahoo Finance, Prophet, Plotly
+Features: Catálogo de acciones clasificado por sector. Sin emojis.
 """
 
 import streamlit as st
@@ -12,34 +13,54 @@ from prophet import Prophet
 from plotly import graph_objs as go
 import pandas as pd
 
-# 1. Configuración de la página 
+# 1. Configuración de la página
 st.set_page_config(
     page_title="AI Stock Vision",
-    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Título principal 
 st.title('AI Stock Vision: Análisis y Predicción')
 
+# --- BASE DE DATOS DE TICKERS (CATÁLOGO) ---
+STOCK_DB = {
+    "Favoritos": ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "NFLX"],
+    "Tecnología & Software": ["AMD", "INTC", "CRM", "ADBE", "ORCL", "IBM", "SAP", "SPOT"],
+    "Finanzas & Bancos": ["JPM", "BAC", "V", "MA", "GS", "MS", "PYPL", "AXP"],
+    "Automotriz": ["F", "GM", "TM", "HMC", "RACE", "STLA"],
+    "Salud & Farmacéutica": ["JNJ", "PFE", "MRNA", "LLY", "UNH", "ABBV"],
+    "Consumo & Retail": ["WMT", "KO", "PEP", "MCD", "SBUX", "NKE", "DIS"],
+    "Energía & Petróleo": ["XOM", "CVX", "SHELL", "BP", "TTE"],
+    "Minerales & Commodities": ["GOLD", "SLV", "FCX", "RIO", "VALE", "CL=F", "GC=F"],
+    "Criptomonedas": ["BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD", "DOGE-USD"],
+    "Índices & ETFs": ["SPY", "QQQ", "DIA", "IWM", "VOO", "VTI"],
+    "Búsqueda Manual": [] 
+}
+
 # 2. Sidebar: Panel de Control
-st.sidebar.header("⚙️ Panel de Control")
-selected_stock = st.sidebar.text_input("Símbolo (Ticker)", "AAPL").upper() 
+st.sidebar.header("Selección de Activo")
+
+# Selector de Categoría
+sector = st.sidebar.selectbox("Selecciona un Sector:", list(STOCK_DB.keys()))
+
+# Lógica para seleccionar el Ticker
+if sector == "Búsqueda Manual":
+    selected_stock = st.sidebar.text_input("Escribe el Ticker (ej: BABA):", "AAPL").upper()
+else:
+    selected_stock = st.sidebar.selectbox("Selecciona la Empresa:", STOCK_DB[sector])
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Parámetros de IA")
 n_years = st.sidebar.slider('Años de aprendizaje:', 1, 10, 5)
 prediction_months = st.sidebar.slider('Meses a predecir:', 1, 24, 12)
 
-# 3. Función de Carga 
+# 3. Función de Carga
 start_date = date.today() - timedelta(days=n_years * 365)
 start_date_str = start_date.strftime("%Y-%m-%d")
 
 @st.cache_data
 def load_data(ticker, start):
     try:
-
         end_date = date.today() + timedelta(days=1)
         df = yf.download(ticker, start=start, end=end_date.strftime("%Y-%m-%d"))
         
@@ -59,91 +80,77 @@ def load_data(ticker, start):
         return pd.DataFrame()
 
 # Cargar datos
+data_load_state = st.empty() 
+data_load_state.text('Descargando datos del mercado...')
 data = load_data(selected_stock, start_date_str)
+data_load_state.empty() 
 
 # 4. Lógica Principal
 if data.empty:
-    st.error(f" No se encontraron datos para '{selected_stock}'. Intenta con otro ticker (ej: TSLA, MSFT, BTC-USD).")
+    st.error(f"No pudimos encontrar datos para {selected_stock}. Si usaste búsqueda manual, verifica el símbolo en Yahoo Finance.")
 else:
-    # --- A. METRICAS ENCABEZADO ---
-    # Calculamos precio actual y variación
+    # --- A. METRICAS ---
     last_close = data['Close'].iloc[-1]
     prev_close = data['Close'].iloc[-2]
     variation = last_close - prev_close
     pct_variation = (variation / prev_close) * 100
     
     col1, col2, col3, col4 = st.columns(4)
-    
     with col1:
-        st.metric(label=f"Precio Actual ({selected_stock})", 
-                  value=f"${last_close:.2f}", 
-                  delta=f"{variation:.2f} ({pct_variation:.2f}%)")
-    
+        st.metric(f"Precio ({selected_stock})", f"${last_close:.2f}", f"{variation:.2f} ({pct_variation:.2f}%)")
     with col2:
-        st.metric(label="Volumen", 
-                  value=f"{data['Volume'].iloc[-1]:,}")
-
+        st.metric("Volumen", f"{data['Volume'].iloc[-1]:,}")
     with col3:
-        st.metric(label="Máximo (52 semanas)", 
-                  value=f"${data['High'].tail(365).max():.2f}")
-        
+        st.metric("Máximo Anual", f"${data['High'].tail(365).max():.2f}")
     with col4:
-        st.metric(label="Mínimo (52 semanas)", 
-                  value=f"${data['Low'].tail(365).min():.2f}")
+        st.metric("Mínimo Anual", f"${data['Low'].tail(365).min():.2f}")
 
     st.markdown("---")
 
-    # --- B. SISTEMA DE PESTAÑAS ---
-    tab1, tab2, tab3 = st.tabs([" Análisis Histórico", " Predicción IA", " Datos"])
+    # --- B. PESTAÑAS ---
+    tab1, tab2, tab3 = st.tabs(["Histórico", "Predicción IA", "Datos"])
 
     # PESTAÑA 1: Histórico
     with tab1:
-        st.subheader("Evolución del Precio")
+        st.subheader(f"Evolución: {selected_stock}")
         fig_hist = go.Figure()
         fig_hist.add_trace(go.Scatter(
             x=data['Date'], y=data['Close'], 
-            name="Precio Cierre",
+            name="Cierre",
             line=dict(color='#0068C9', width=2),
-            fill='tozeroy', 
+            fill='tozeroy',
             fillcolor='rgba(0, 104, 201, 0.1)'
         ))
-        fig_hist.layout.update(
-            xaxis_rangeslider_visible=True,
-            hovermode="x unified",
-            margin=dict(l=0, r=0, t=30, b=0)
-        )
+        fig_hist.layout.update(xaxis_rangeslider_visible=True, hovermode="x unified", margin=dict(t=30))
         st.plotly_chart(fig_hist, use_container_width=True)
 
-    # PESTAÑA 2: Predicción IA (Prophet)
+    # PESTAÑA 2: Predicción
     with tab2:
-        st.subheader(f"Proyección a {prediction_months} meses")
+        st.subheader(f"Proyección IA a {prediction_months} meses")
         
-        # Preparamos datos para Prophet
         df_train = data[['Date', 'Close']].copy()
         df_train = df_train.rename(columns={"Date": "ds", "Close": "y"})
 
         if len(df_train) < 20:
-            st.warning(" Datos insuficientes para predecir.")
+            st.warning("Datos insuficientes para predecir.")
         else:
-            with st.spinner(' La IA está analizando tendencias...'):
+            with st.spinner('Analizando tendencias de mercado...'):
                 m = Prophet()
                 m.fit(df_train)
                 future = m.make_future_dataframe(periods=prediction_months * 30)
                 forecast = m.predict(future)
 
-                # Gráfico Rojo = Futuro
                 fig_pred = go.Figure()
-                
                 last_real_date = data['Date'].max()
                 future_only = forecast[forecast['ds'] > last_real_date]
 
+                # Línea predicción
                 fig_pred.add_trace(go.Scatter(
                     x=future_only['ds'], y=future_only['yhat'],
-                    name="Predicción IA",
+                    name="Tendencia IA",
                     line=dict(color='#FF4B4B', width=3)
                 ))
-                
-                # Intervalo de confianza
+                # Sombras (Intervalo de confianza)
                 fig_pred.add_trace(go.Scatter(
                     x=future_only['ds'], y=future_only['yhat_upper'],
                     mode='lines', line=dict(width=0), showlegend=False, hoverinfo='skip'
@@ -155,30 +162,19 @@ else:
                     showlegend=False, hoverinfo='skip'
                 ))
 
-                fig_pred.update_layout(
-                    title="Tendencia Esperada",
-                    yaxis_title="Precio Estimado (USD)",
-                    hovermode="x unified"
-                )
+                fig_pred.update_layout(title="Proyección de Valor", hovermode="x unified")
                 st.plotly_chart(fig_pred, use_container_width=True)
                 
-                # Análisis de tendencia simple
-                start_pred = future_only['yhat'].iloc[0]
-                end_pred = future_only['yhat'].iloc[-1]
-                trend = "ALCISTA " if end_pred > start_pred else "BAJISTA "
-                
-                st.info(f"Tendencia proyectada: **{trend}** (Basado en análisis de estacionalidad)")
+                # Análisis de texto
+                change = future_only['yhat'].iloc[-1] - future_only['yhat'].iloc[0]
+                trend_text = "ALCISTA" if change > 0 else "BAJISTA"
+                st.info(f"Tendencia proyectada: {trend_text}")
 
-                # Botón de descarga CSV
-                csv = future_only[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label=" Descargar Predicción (CSV)",
-                    data=csv,
-                    file_name=f'prediccion_{selected_stock}.csv',
-                    mime='text/csv',
-                )
+                # Descarga CSV
+                csv = future_only.to_csv(index=False).encode('utf-8')
+                st.download_button("Descargar Proyección (CSV)", csv, f'pred_{selected_stock}.csv', 'text/csv')
 
-    # PESTAÑA 3: Datos Crudos
+    # PESTAÑA 3: Datos
     with tab3:
-        st.subheader("Datos Recientes")
+        st.subheader("Datos en Crudo")
         st.dataframe(data.sort_values('Date', ascending=False), use_container_width=True)
