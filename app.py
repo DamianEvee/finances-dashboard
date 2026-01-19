@@ -1,9 +1,6 @@
 """
 Dashboard Financiero con Machine Learning
 -----------------------------------------
-Esta aplicación permite visualizar datos financieros históricos y predecir
-precios futuros utilizando el modelo Prophet de Meta (Facebook).
-
 Autor: Evee_
 Tech Stack: Streamlit, Yahoo Finance, Prophet, Plotly
 """
@@ -29,8 +26,8 @@ st.title('📈 Dashboard Financiero con Predicción AI')
 st.sidebar.header("Configuración")
 selected_stock = st.sidebar.text_input("Símbolo (Ticker)", "AAPL")
 
-# Slider 1: Cuánto PASADO estudiar
-n_years = st.sidebar.slider('Años de historia para entrenar:', 1, 5, 2)
+# --- CORRECCIÓN 1: Aumentado el límite a 10 años ---
+n_years = st.sidebar.slider('Años de historia para entrenar:', 1, 10, 5)
 
 # Slider 2: Cuánto FUTURO predecir
 prediction_months = st.sidebar.slider('Meses a predecir:', 1, 24, 12)
@@ -39,8 +36,7 @@ prediction_months = st.sidebar.slider('Meses a predecir:', 1, 24, 12)
 start_date = date.today() - timedelta(days=n_years * 365)
 start_date_str = start_date.strftime("%Y-%m-%d")
 
-
-# 4. Función de Carga de datos (con Cache)
+# 4. Función de Carga de datos
 @st.cache_data
 def load_data(ticker, start):
     """Descarga y limpia los datos de Yahoo Finance."""
@@ -50,13 +46,11 @@ def load_data(ticker, start):
         if df.empty:
             return df
 
-        # Aplanar MultiIndex si existe (fix para yfinance reciente)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 
         df.reset_index(inplace=True)
 
-        # Eliminar zona horaria para compatibilidad con Prophet
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
 
@@ -65,95 +59,76 @@ def load_data(ticker, start):
         st.error(f"Error cargando datos: {e}")
         return pd.DataFrame()
 
-
 # Ejecución de carga
 data_load_state = st.text('Cargando datos...')
 data = load_data(selected_stock, start_date_str)
 data_load_state.text('¡Datos cargados!')
 
-
 # 5. Lógica Principal y Visualización
 if data.empty:
-    st.error(f"⚠️ No se encontraron datos para el símbolo '{selected_stock}'. Verifique el ticker.")
+    st.error(f"⚠️ No se encontraron datos para '{selected_stock}'.")
 else:
-    # --- VISUALIZACIÓN DE DATOS HISTÓRICOS ---
-    st.subheader(f'Datos Históricos de {selected_stock}')
-    st.write(data.tail())
+    # --- CORRECCIÓN 2: Tabla interactiva en vez de estática ---
+    st.subheader(f'Datos Históricos ({n_years} años)')
+    st.caption("Usa el scroll en la tabla para ver los datos antiguos.")
+    # st.dataframe permite hacer scroll y ver todos los años, no solo el final
+    st.dataframe(data, height=300, use_container_width=True)
 
-    def plot_raw_data():
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=data['Date'], y=data['Open'], name="Apertura"))
-        fig.add_trace(go.Scatter(x=data['Date'], y=data['Close'], name="Cierre"))
-        fig.layout.update(
-            title_text=f'Evolución Histórica: {selected_stock}',
-            xaxis_rangeslider_visible=True,
-            hovermode="x unified"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-    plot_raw_data()
-
-    # --- PREDICCIÓN CON MACHINE LEARNING (PROPHET) ---
+    # --- PREDICCIÓN CON MACHINE LEARNING ---
     st.subheader(f'🔮 Predicción de Precio a {prediction_months} meses')
 
-    # Preparar datos para Prophet (requiere columnas 'ds' y 'y')
     df_train = data[['Date', 'Close']].copy()
     df_train = df_train.rename(columns={"Date": "ds", "Close": "y"})
 
     if len(df_train) < 20:
-        st.warning("⚠️ Necesitas más datos históricos para generar una predicción fiable.")
+        st.warning("⚠️ Necesitas más datos históricos.")
     else:
         with st.spinner('Entrenando modelo de IA...'):
             m = Prophet()
             m.fit(df_train)
 
-            # Crear fechas futuras
             future = m.make_future_dataframe(periods=prediction_months * 30)
             forecast = m.predict(future)
 
-            # Mostrar tabla de predicciones
-            st.write("Datos de la predicción:")
-            st.write(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail())
+            # Mostrar tabla de predicciones (Interactivo también)
+            st.write("Datos de la proyección futura:")
+            st.dataframe(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(prediction_months*30), height=200)
 
-            # --- GRÁFICO PERSONALIZADO (HISTORIA vs PREDICCIÓN) ---
+            # --- CORRECCIÓN 3: Gráfico SOLO PREDICCIÓN ---
             fig_custom = go.Figure()
 
-            # 1. Historia (Línea Azul)
-            fig_custom.add_trace(go.Scatter(
-                x=data['Date'],
-                y=data['Close'],
-                name="Historia Real",
-                line=dict(color='blue')
-            ))
+            # Calculamos dónde empieza el futuro para pintar solo desde ahí
+            last_real_date = data['Date'].max()
+            future_only = forecast[forecast['ds'] > last_real_date]
 
-            # 2. Predicción (Línea Roja Punteada)
-            last_date = data['Date'].max()
-            future_only = forecast[forecast['ds'] > last_date]
-
+            # Línea de Predicción (Roja)
             fig_custom.add_trace(go.Scatter(
                 x=future_only['ds'],
                 y=future_only['yhat'],
-                name="Predicción IA",
-                line=dict(color='red', width=4, dash='dash')
+                name="Tendencia Futura",
+                line=dict(color='#ff2b2b', width=4) # Rojo sólido intenso
             ))
 
-            # 3. Intervalo de Confianza (Sombra)
+            # Intervalo de Confianza Superior
             fig_custom.add_trace(go.Scatter(
                 x=future_only['ds'], y=future_only['yhat_upper'],
                 mode='lines', line=dict(width=0), showlegend=False, hoverinfo='skip'
             ))
+            
+            # Intervalo de Confianza Inferior (Crea la sombra)
             fig_custom.add_trace(go.Scatter(
                 x=future_only['ds'], y=future_only['yhat_lower'],
                 fill='tonexty', mode='lines', line=dict(width=0),
-                fillcolor='rgba(255, 0, 0, 0.2)',
+                fillcolor='rgba(255, 43, 43, 0.2)', # Sombra roja
                 showlegend=False, hoverinfo='skip'
             ))
 
             fig_custom.update_layout(
-                title=f"Proyección Visual: {selected_stock}",
-                xaxis_title="Fecha",
-                yaxis_title="Precio (USD)",
-                hovermode="x unified"
+                title=f"Proyección Futura Exclusiva: {selected_stock}",
+                xaxis_title="Fecha Futura",
+                yaxis_title="Precio Estimado (USD)",
+                hovermode="x unified",
+                showlegend=True
             )
 
             st.plotly_chart(fig_custom, use_container_width=True)
