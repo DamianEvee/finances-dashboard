@@ -71,7 +71,6 @@ else:
     # --- CORRECCIÓN 2: Tabla interactiva en vez de estática ---
     st.subheader(f'Datos Históricos ({n_years} años)')
     st.caption("Usa el scroll en la tabla para ver los datos antiguos.")
-    # st.dataframe permite hacer scroll y ver todos los años, no solo el final
     st.dataframe(data, height=300, use_container_width=True)
 
     # --- PREDICCIÓN CON MACHINE LEARNING ---
@@ -106,7 +105,7 @@ else:
                 x=future_only['ds'],
                 y=future_only['yhat'],
                 name="Tendencia Futura",
-                line=dict(color='#ff2b2b', width=4) # Rojo sólido intenso
+                line=dict(color='#ff2b2b', width=4) 
             ))
 
             # Intervalo de Confianza Superior
@@ -115,11 +114,11 @@ else:
                 mode='lines', line=dict(width=0), showlegend=False, hoverinfo='skip'
             ))
             
-            # Intervalo de Confianza Inferior (Crea la sombra)
+            # Intervalo de Confianza Inferior 
             fig_custom.add_trace(go.Scatter(
                 x=future_only['ds'], y=future_only['yhat_lower'],
                 fill='tonexty', mode='lines', line=dict(width=0),
-                fillcolor='rgba(255, 43, 43, 0.2)', # Sombra roja
+                fillcolor='rgba(255, 43, 43, 0.2)',
                 showlegend=False, hoverinfo='skip'
             ))
 
