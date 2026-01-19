@@ -2,8 +2,9 @@
 Dashboard Financiero Profesional v3.0 (Clean Version)
 -----------------------------------------
 Autor: Evee_
+
 Tech Stack: Streamlit, Yahoo Finance, Prophet, Plotly
-Features: Catálogo de acciones clasificado por sector. Sin emojis.
+Features: Catálogo de acciones clasificado por sector.
 """
 import streamlit as st
 from datetime import date, timedelta
@@ -14,12 +15,12 @@ import pandas as pd
 
 # 1. Configuración de la página
 st.set_page_config(
-    page_title="AI Stock Vision (EUR)",
+    page_title="AI Stock Vision",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-st.title(' AI Stock Vision')
+st.title('AI Stock Vision')
 
 # --- BASE DE DATOS DE TICKERS ---
 STOCK_DB = {
