@@ -19,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title(' AI Stock Vision: Análisis en Euros')
+st.title(' AI Stock Vision')
 
 # --- BASE DE DATOS DE TICKERS ---
 STOCK_DB = {
@@ -102,7 +102,7 @@ if data.empty:
     st.error(f"No hay datos para {selected_stock}.")
 else:
     # Mostramos la tasa de conversión usada (Transparencia para el usuario)
-    st.caption(f"ℹ️ Datos convertidos a Euros (Tasa aplicada: 1 USD = {rate_used:.4f} EUR)")
+    st.caption(f" Datos convertidos a Euros (Tasa aplicada: 1 USD = {rate_used:.4f} EUR)")
 
     # Métricas
     last_close = data['Close'].iloc[-1]
