@@ -5,10 +5,6 @@ Autor: Evee_
 Tech Stack: Streamlit, Yahoo Finance, Prophet, Plotly
 Features: Catálogo de acciones clasificado por sector. Sin emojis.
 """
-"""
-Dashboard Financiero v3.1 (Categorías)
------------------------------------------
-"""
 import streamlit as st
 from datetime import date, timedelta
 import yfinance as yf
