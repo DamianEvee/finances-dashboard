@@ -13,10 +13,14 @@ st.title('📈 Dashboard Financiero con Predicción AI')
 # 2. Sidebar
 st.sidebar.header("Configuración")
 selected_stock = st.sidebar.text_input("Símbolo (Ticker)", "AAPL") 
-n_years = st.sidebar.slider('Años de datos históricos:', 1, 5, 2)
+
+# Slider 1: Cuánto PASADO estudiar
+n_years = st.sidebar.slider('Años de historia para entrenar:', 1, 5, 2)
+
+# Slider 2: Cuánto FUTURO predecir 
+prediction_months = st.sidebar.slider('Meses a predecir:', 1, 24, 12) # De 1 mes a 2 años
 
 # 3. Calcular fecha de inicio dinámica
-# Restamos a la fecha de hoy los años seleccionados por el usuario
 start_date = date.today() - timedelta(days=n_years*365)
 start_date_str = start_date.strftime("%Y-%m-%d")
 
@@ -28,20 +32,17 @@ def load_data(ticker, start):
     if df.empty:
         return df
         
-    # Aplanamos MultiIndex
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
     
     df.reset_index(inplace=True)
     
-    # Quitamos zona horaria
     if 'Date' in df.columns:
         df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
         
     return df
 
 data_load_state = st.text('Cargando datos...')
-# Pasamos el ticker Y la fecha calculada
 data = load_data(selected_stock, start_date_str)
 data_load_state.text('¡Datos cargados!')
 
@@ -49,12 +50,9 @@ data_load_state.text('¡Datos cargados!')
 if data.empty:
     st.error(f"⚠️ No se encontraron datos para '{selected_stock}'.")
 else:
-    # Mostrar datos
     st.subheader(f'Datos Históricos de {selected_stock}')
-    st.write(f"Mostrando datos desde: **{start_date_str}**") # Confirmación visual
     st.write(data.tail())
 
-    # Gráfico
     def plot_raw_data():
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=data['Date'], y=data['Open'], name="Apertura"))
@@ -64,19 +62,20 @@ else:
         
     plot_raw_data()
 
-    # Predicción
-    st.subheader(f'🔮 Predicción de Precio a 1 año')
+    # Predicción Dinámica
+    st.subheader(f'🔮 Predicción de Precio a {prediction_months} meses') # Título dinámico
     
     df_train = data[['Date', 'Close']].copy()
     df_train = df_train.rename(columns={"Date": "ds", "Close": "y"})
 
     if len(df_train) < 20:
-        st.warning("⚠️ Necesitas más de 1 año de datos para que la IA funcione bien. Aumenta los años en la barra lateral.")
+        st.warning("⚠️ Necesitas más datos históricos para predecir.")
     else:
-        with st.spinner('Entrenando la IA...'):
+        with st.spinner('Calculando futuro...'):
             m = Prophet()
             m.fit(df_train)
-            future = m.make_future_dataframe(periods=365)
+            
+            future = m.make_future_dataframe(periods=prediction_months * 30) 
             forecast = m.predict(future)
 
             st.write(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail())
