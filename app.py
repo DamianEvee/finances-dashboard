@@ -39,7 +39,10 @@ start_date_str = start_date.strftime("%Y-%m-%d")
 @st.cache_data
 def load_data(ticker, start):
     try:
-        df = yf.download(ticker, start=start, end=date.today().strftime("%Y-%m-%d"))
+
+        end_date = date.today() + timedelta(days=1)
+        
+        df = yf.download(ticker, start=start, end=end_date.strftime("%Y-%m-%d"))
         
         if df.empty:
             return df
@@ -52,7 +55,6 @@ def load_data(ticker, start):
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
         
-        # Ordenamos los datos por fecha 
         df = df.sort_values('Date')
 
         return df
@@ -72,12 +74,13 @@ else:
     # --- SECCIÓN 1: DATOS HISTÓRICOS (GRÁFICO AZUL) ---
     st.subheader(f'Datos Históricos ({n_years} años)')
     
-    # Tabla con scroll
     st.dataframe(data, height=200, use_container_width=True)
 
-    # GRÁFICA AZUL 
-    st.write("Generando gráfico histórico...") 
-    
+    # Texto de confirmación visual
+    last_date_in_data = data['Date'].max().strftime('%Y-%m-%d')
+    st.caption(f"Último dato disponible en el mercado: {last_date_in_data}")
+
+    # GRÁFICA AZUL
     fig_hist = go.Figure()
     fig_hist.add_trace(go.Scatter(
         x=data['Date'], 
@@ -110,11 +113,10 @@ else:
             future = m.make_future_dataframe(periods=prediction_months * 30)
             forecast = m.predict(future)
 
-            # Tabla de predicción
             st.write("Datos de la proyección futura:")
             st.dataframe(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(prediction_months*30), height=200)
 
-            # GRÁFICA ROJA (Solo futuro)
+            # GRÁFICA ROJA
             fig_pred = go.Figure()
 
             last_real_date = data['Date'].max()
