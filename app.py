@@ -5,6 +5,7 @@ Autor: Evee_
 Tech Stack: Streamlit, Yahoo Finance, Prophet, Plotly
 Features: Catálogo de acciones clasificado por sector. Sin emojis.
 """
+
 import streamlit as st
 from datetime import date, timedelta
 import yfinance as yf
@@ -21,7 +22,7 @@ st.set_page_config(
 
 st.title('AI Stock Vision: Análisis y Predicción')
 
-# --- BASE DE DATOS DE TICKERS (Tus Categorías) ---
+# --- BASE DE DATOS DE TICKERS ---
 STOCK_DB = {
     "Favoritos": ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "NFLX"],
     "Tecnología": ["AMD", "INTC", "CRM", "ADBE", "ORCL", "IBM", "SAP", "SPOT"],
@@ -36,13 +37,11 @@ STOCK_DB = {
     "Búsqueda Manual": [] 
 }
 
-# 2. Sidebar: Panel de Control
+# 2. Sidebar
 st.sidebar.header("Selección de Activo")
 
-# A) Selector de Sector
 sector = st.sidebar.selectbox("Selecciona un Sector:", list(STOCK_DB.keys()))
 
-# B) Selector de Empresa (Cambia según el sector)
 if sector == "Búsqueda Manual":
     selected_stock = st.sidebar.text_input("Escribe el Ticker:", "AAPL").upper()
 else:
@@ -126,20 +125,38 @@ else:
                 last_real_date = data['Date'].max()
                 future_only = forecast[forecast['ds'] > last_real_date]
 
+                # 1. Línea Principal (Predicción Central)
                 fig_pred.add_trace(go.Scatter(
-                    x=future_only['ds'], y=future_only['yhat'], name="Tendencia IA",
-                    line=dict(color='#FF4B4B', width=3)
+                    x=future_only['ds'], y=future_only['yhat'], 
+                    name="Predicción (Promedio)",
+                    line=dict(color='#FF4B4B', width=4) # Línea gruesa roja
                 ))
-                fig_pred.add_trace(go.Scatter(
-                    x=future_only['ds'], y=future_only['yhat_lower'],
-                    fill='tonexty', mode='lines', line=dict(width=0),
-                    fillcolor='rgba(255, 75, 75, 0.2)', showlegend=False
-                ))
+
+                # 2. Límite Superior (Máximo visible)
                 fig_pred.add_trace(go.Scatter(
                     x=future_only['ds'], y=future_only['yhat_upper'],
-                    mode='lines', line=dict(width=0), showlegend=False
+                    name="Máximo Estimado",
+                    mode='lines', 
+                    line=dict(width=1, color='rgba(255, 75, 75, 0.5)', dash='dot'), # Punteada visible
+                    showlegend=True
                 ))
-                fig_pred.update_layout(hovermode="x unified")
+
+                # 3. Límite Inferior (Mínimo visible + Sombra)
+                fig_pred.add_trace(go.Scatter(
+                    x=future_only['ds'], y=future_only['yhat_lower'],
+                    name="Mínimo Estimado",
+                    mode='lines', 
+                    line=dict(width=1, color='rgba(255, 75, 75, 0.5)', dash='dot'), # Punteada visible
+                    fill='tonexty', # Esto rellena hasta la traza anterior (el máximo)
+                    fillcolor='rgba(255, 75, 75, 0.2)', # Sombra roja suave
+                    showlegend=True
+                ))
+
+                fig_pred.update_layout(
+                    title="Tendencia Esperada",
+                    hovermode="x unified",
+                    yaxis_title="Precio Estimado (USD)"
+                )
                 st.plotly_chart(fig_pred, use_container_width=True)
                 
                 csv = future_only.to_csv(index=False).encode('utf-8')
