@@ -63,7 +63,7 @@ data = load_data(selected_stock, start_date_str)
 
 # 4. Lógica Principal
 if data.empty:
-    st.error(f"❌ No se encontraron datos para '{selected_stock}'. Intenta con otro ticker (ej: TSLA, MSFT, BTC-USD).")
+    st.error(f" No se encontraron datos para '{selected_stock}'. Intenta con otro ticker (ej: TSLA, MSFT, BTC-USD).")
 else:
     # --- A. METRICAS ENCABEZADO ---
     # Calculamos precio actual y variación
@@ -94,7 +94,7 @@ else:
     st.markdown("---")
 
     # --- B. SISTEMA DE PESTAÑAS ---
-    tab1, tab2, tab3 = st.tabs(["📊 Análisis Histórico", "🔮 Predicción IA", "📥 Datos"])
+    tab1, tab2, tab3 = st.tabs([" Análisis Histórico", " Predicción IA", " Datos"])
 
     # PESTAÑA 1: Histórico
     with tab1:
