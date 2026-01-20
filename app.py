@@ -169,7 +169,7 @@ def predict_lstm_tf(data, days_to_predict, look_back_window, num_epochs):
 
 # --- EJECUCIÓN ---
 status = st.empty()
-status.text('⏳ Descargando datos...')
+status.text('Descargando datos...')
 
 data, rate = load_data(selected_stock)
 
@@ -198,7 +198,7 @@ if not data.empty:
     
     if not forecast.empty and len(forecast) > 0:
         pred_end = forecast['Predicted_Close'].iloc[-1]
-        trend = "ALCISTA 🚀" if pred_end > last_price else "BAJISTA 🔻"
+        trend = "ALCISTA " if pred_end > last_price else "BAJISTA 🔻"
         pct_change = ((pred_end - last_price) / last_price) * 100
         col3.metric("Tendencia IA", trend, f"{pct_change:.2f}%")
 
