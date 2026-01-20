@@ -56,7 +56,7 @@ epochs = st.sidebar.slider('Epochs (Entrenamiento):', 1, 20, 5, help="Más epoch
 
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
-    st.sidebar.success(f"🚀 Aceleración GPU Activada: {len(gpus)} dispositivo(s)")
+    st.sidebar.success(f"Aceleración GPU Activada: {len(gpus)} dispositivo(s)")
 else:
     st.sidebar.warning("⚠️ Usando CPU (Más lento)")
 
@@ -176,7 +176,7 @@ data, rate = load_data(selected_stock)
 forecast = pd.DataFrame()
 
 if not data.empty:
-    status.text(f'🧠 Entrenando LSTM en TensorFlow... (Epochs: {epochs})')
+    status.text(f' Entrenando LSTM en TensorFlow... (Epochs: {epochs})')
     bar = st.progress(0)
     
     try:
@@ -204,7 +204,7 @@ if not data.empty:
 
     st.markdown("---")
     
-    tab1, tab2 = st.tabs(["📉 Gráfico Neuronal", "📋 Datos"])
+    tab1, tab2 = st.tabs(["Gráfico Neuronal", "Datos"])
     
     with tab1:
         fig = go.Figure()
