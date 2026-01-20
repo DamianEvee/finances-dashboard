@@ -3,7 +3,7 @@ Dashboard Financiero
 -----------------------------------------
 Autor: Evee_
 Motor: TensorFlow / Keras (LSTM)
-Descripción: Usa una Red Neuronal Recurrente (LSTM)
+
 """
 
 import streamlit as st
@@ -15,7 +15,7 @@ from datetime import date, timedelta
 from sklearn.preprocessing import MinMaxScaler
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, LSTM, Input
+from tensorflow.keras.layers import Dense, LSTM, Input, Dropout
 
 # 1. Configuración
 st.set_page_config(
@@ -49,39 +49,38 @@ else:
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Hyperparámetros LSTM")
-look_back = st.sidebar.slider('Memoria (Días previos):', 10, 90, 60, help="Días que la IA mira hacia atrás para decidir el siguiente.")
-prediction_days = st.sidebar.slider('Días a predecir:', 10, 180, 30)
-epochs = st.sidebar.slider('Epochs (Entrenamiento):', 1, 20, 5, help="Más epochs = más preciso, pero más lento.")
 
 
+look_back = st.sidebar.slider('Memoria (Días previos):', 30, 120, 60, help="Ventana de contexto para predecir el siguiente día.")
+
+
+prediction_days = st.sidebar.slider('Días a predecir:', 5, 45, 30)
+
+epochs = st.sidebar.slider('Epochs (Entrenamiento):', 1, 30, 10, help="Más epochs ayuda a capturar patrones complejos, pero tarda más.")
+
+# Verificar aceleración de hardware
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
     st.sidebar.success(f"Aceleración GPU Activada: {len(gpus)} dispositivo(s)")
 else:
-    st.sidebar.warning("⚠️ Usando CPU (Más lento)")
+    st.sidebar.warning("Usando CPU (Más lento)")
 
 # 3. Funciones de Carga
 def get_exchange_rate():
     try:
         fx = yf.download("EUR=X", period="1d", progress=False)
-        
-
         if isinstance(fx.columns, pd.MultiIndex):
             fx.columns = fx.columns.get_level_values(0)
-            
         if fx.empty: return 1.0
-        
         val = fx['Close'].iloc[-1]
-        
-
-        if hasattr(val, 'item'):
-            return float(val.item())
+        if hasattr(val, 'item'): return float(val.item())
         return float(val)
     except: return 1.0
 
 def load_data(ticker):
     try:
-        start = (date.today() - timedelta(days=10*365)).strftime("%Y-%m-%d")
+
+        start = (date.today() - timedelta(days=12*365)).strftime("%Y-%m-%d")
         end = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
         
         df = yf.download(ticker, start=start, end=end, progress=False)
@@ -106,7 +105,7 @@ def load_data(ticker):
     except Exception as e:
         return pd.DataFrame(), 1.0
 
-# --- CEREBRO TENSORFLOW (LSTM) ---
+# --- CEREBRO TENSORFLOW (LSTM POTENCIADO) ---
 def predict_lstm_tf(data, days_to_predict, look_back_window, num_epochs):
     # Preprocesamiento
     df_close = data.filter(['Close'])
@@ -117,26 +116,31 @@ def predict_lstm_tf(data, days_to_predict, look_back_window, num_epochs):
     
     x_train, y_train = [], []
     train_len = len(scaled_data)
-
-    start_idx = max(look_back_window, train_len - 2000) 
+    
+    start_idx = look_back_window
     
     for i in range(start_idx, train_len):
         x_train.append(scaled_data[i-look_back_window:i, 0])
         y_train.append(scaled_data[i, 0])
         
     x_train, y_train = np.array(x_train), np.array(y_train)
-    
-    # Reshape para LSTM [samples, time steps, features]
     x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
     
-    # Construir la Red Neuronal
+    # --- ARQUITECTURA MÁS POTENTE Y REALISTA ---
     model = Sequential()
     model.add(Input(shape=(x_train.shape[1], 1)))
-    model.add(LSTM(50, return_sequences=False))
+    
+    # 1. Capa LSTM Potente
+    model.add(LSTM(100, return_sequences=False))
+    
+    # 2. Capa Dropout
+    model.add(Dropout(0.2))
+    
+    # 3. Capas Densas
     model.add(Dense(25)) 
     model.add(Dense(1))
     
-    # Compilar y Entrenar
+    # Compilar
     model.compile(optimizer='adam', loss='mean_squared_error')
     model.fit(x_train, y_train, batch_size=32, epochs=num_epochs, verbose=0)
     
@@ -169,14 +173,14 @@ def predict_lstm_tf(data, days_to_predict, look_back_window, num_epochs):
 
 # --- EJECUCIÓN ---
 status = st.empty()
-status.text('Descargando datos...')
+status.text('Descargando 10 años de historia...')
 
 data, rate = load_data(selected_stock)
 
 forecast = pd.DataFrame()
 
 if not data.empty:
-    status.text(f' Entrenando LSTM en TensorFlow... (Epochs: {epochs})')
+    status.text(f'Entrenando LSTM (100 Neuronas + Dropout)... Epochs: {epochs}')
     bar = st.progress(0)
     
     try:
@@ -189,7 +193,7 @@ if not data.empty:
 
 # --- VISUALIZACIÓN ---
 if not data.empty:
-    st.caption(f"Divisa: EUR (Tasa: {rate:.4f}) | Motor: TensorFlow Keras (LSTM)")
+    st.caption(f"Divisa: EUR (Tasa: {rate:.4f}) | Motor: TensorFlow LSTM (100 Units)")
     
     last_price = data['Close'].iloc[-1]
     col1, col2, col3 = st.columns(3)
@@ -198,9 +202,16 @@ if not data.empty:
     
     if not forecast.empty and len(forecast) > 0:
         pred_end = forecast['Predicted_Close'].iloc[-1]
-        trend = "ALCISTA" if pred_end > last_price else "BAJISTA"
+        
+        trend_color = "normal"
+        if pred_end > last_price:
+            trend = "ALCISTA"
+        else:
+            trend = "BAJISTA"
+            trend_color = "inverse"
+            
         pct_change = ((pred_end - last_price) / last_price) * 100
-        col3.metric("Tendencia IA", trend, f"{pct_change:.2f}%")
+        col3.metric("Tendencia IA", trend, f"{pct_change:.2f}%", delta_color=trend_color)
 
     st.markdown("---")
     
