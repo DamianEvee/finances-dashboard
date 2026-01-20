@@ -16,7 +16,7 @@ import pandas as pd
 
 # 1. Configuración de la página
 st.set_page_config(
-    page_title="AI Stock Vision",
+    page_title="AI Stock Vision (EUR)",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -88,10 +88,12 @@ def load_data(ticker, start):
     except Exception:
         return pd.DataFrame(), 1.0
 
-@st.cache_data
-def generate_forecast(data, months, ticker_name):
+
+def generate_forecast(data, months):
     """Entrena el modelo y genera los datos futuros"""
-    df_train = data[['Date', 'Close']].copy().rename(columns={"Date": "ds", "Close": "y"})
+
+    df_train = data[['Date', 'Close']].copy()
+    df_train = df_train.rename(columns={"Date": "ds", "Close": "y"})
     
     if len(df_train) < 20:
         return pd.DataFrame()
@@ -104,13 +106,16 @@ def generate_forecast(data, months, ticker_name):
 
 # --- EJECUCIÓN ---
 data_load_state = st.empty()
-data_load_state.text('Cargando datos y entrenando IA...')
+data_load_state.text('⏳ Descargando datos del mercado...')
 
 data, rate_used = load_data(selected_stock, start_date_str)
 
+data_load_state.text('🧠 Entrenando Inteligencia Artificial (sin caché)...')
+
 forecast = pd.DataFrame()
 if not data.empty:
-    forecast = generate_forecast(data, prediction_months, selected_stock)
+
+    forecast = generate_forecast(data, prediction_months)
 
 data_load_state.empty()
 
