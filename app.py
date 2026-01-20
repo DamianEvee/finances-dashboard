@@ -1,9 +1,8 @@
 """
-Dashboard Financiero 
+Dashboard Financiero
 -----------------------------------------
 Autor: Evee_
 Motor: TensorFlow / Keras (LSTM)
-
 """
 
 import streamlit as st
@@ -50,15 +49,12 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.subheader("Hyperparámetros LSTM")
 
+st.sidebar.info("Entrenando con 10 años de historial completo.")
 
 look_back = st.sidebar.slider('Memoria (Días previos):', 30, 120, 60, help="Ventana de contexto para predecir el siguiente día.")
-
-
 prediction_days = st.sidebar.slider('Días a predecir:', 5, 45, 30)
+epochs = st.sidebar.slider('Epochs (Entrenamiento):', 1, 30, 10, help="Más epochs ayuda a capturar patrones complejos.")
 
-epochs = st.sidebar.slider('Epochs (Entrenamiento):', 1, 30, 10, help="Más epochs ayuda a capturar patrones complejos, pero tarda más.")
-
-# Verificar aceleración de hardware
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
     st.sidebar.success(f"Aceleración GPU Activada: {len(gpus)} dispositivo(s)")
@@ -95,7 +91,6 @@ def load_data(ticker):
         
         df = df.sort_values('Date')
         
-        # Conversión EUR
         rate = get_exchange_rate()
         cols = ['Open', 'High', 'Low', 'Close']
         for c in cols:
@@ -105,7 +100,7 @@ def load_data(ticker):
     except Exception as e:
         return pd.DataFrame(), 1.0
 
-# --- CEREBRO TENSORFLOW (LSTM POTENCIADO) ---
+# ---CEREBRO TENSORFLOW (LSTM POTENCIADO) ---
 def predict_lstm_tf(data, days_to_predict, look_back_window, num_epochs):
     # Preprocesamiento
     df_close = data.filter(['Close'])
@@ -126,11 +121,11 @@ def predict_lstm_tf(data, days_to_predict, look_back_window, num_epochs):
     x_train, y_train = np.array(x_train), np.array(y_train)
     x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
     
-    # --- ARQUITECTURA MÁS POTENTE Y REALISTA ---
+    # --- ARQUITECTURA 100 NEURONAS ---
     model = Sequential()
     model.add(Input(shape=(x_train.shape[1], 1)))
     
-    # 1. Capa LSTM Potente
+    # 1. Capa LSTM Potente (100 Neuronas)
     model.add(LSTM(100, return_sequences=False))
     
     # 2. Capa Dropout
@@ -197,7 +192,7 @@ if not data.empty:
     
     last_price = data['Close'].iloc[-1]
     col1, col2, col3 = st.columns(3)
-    col1.metric("Precio Actual", f"€{last_price:.2f}")
+    col1.metric("Precio Actual", f"EUR {last_price:.2f}")
     col2.metric("Volumen", f"{data['Volume'].iloc[-1]:,}")
     
     if not forecast.empty and len(forecast) > 0:
@@ -215,7 +210,7 @@ if not data.empty:
 
     st.markdown("---")
     
-    tab1, tab2 = st.tabs(["Gráfico Neuronal", "Datos"])
+    tab1, tab2 = st.tabs(["Grafico Neuronal", "Datos"])
     
     with tab1:
         fig = go.Figure()
@@ -235,13 +230,13 @@ if not data.empty:
             
             fig.add_trace(go.Scatter(
                 x=forecast_plot['Date'], y=forecast_plot['Predicted_Close'],
-                name="Proyección LSTM",
+                name="Proyeccion LSTM",
                 line=dict(color='#FF4B4B', width=3)
             ))
 
         fig.update_layout(
-            title=f"Análisis Deep Learning: {selected_stock}",
-            yaxis_title="Precio (€)",
+            title=f"Analisis Deep Learning: {selected_stock}",
+            yaxis_title="Precio (EUR)",
             hovermode="x unified",
             height=600
         )
