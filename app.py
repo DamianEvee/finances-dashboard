@@ -1,8 +1,13 @@
 """
-Dashboard Financiero
+Dashboard Financiero v8.3 (Extreme Memory Edition)
 -----------------------------------------
 Autor: Evee_
 Motor: TensorFlow / Keras (LSTM)
+Mejoras:
+1. Slider de Memoria ampliado a 10 AÑOS (3650 días).
+2. Slider de Neuronas EXPLICITO (50-200).
+3. Entrenamiento profundo desbloqueado.
+4. Sin Emojis (Clean Interface).
 """
 
 import streamlit as st
@@ -51,12 +56,16 @@ st.sidebar.subheader("Control Total IA")
 
 st.sidebar.info("Entrenando con historial completo disponible.")
 
+# MODIFICADO: Memoria hasta 10 AÑOS (3650 días)
 look_back = st.sidebar.slider('Memoria (Dias previos):', 30, 3650, 365, help="Cuantos dias del pasado mira la IA para predecir el futuro.")
 
+# NUEVO: Control de Neuronas (Potencia)
 neurons = st.sidebar.slider('Potencia (Neuronas LSTM):', 50, 200, 100, help="Mas neuronas = cerebro mas complejo.")
 
+# MODIFICADO: Predicción
 prediction_days = st.sidebar.slider('Dias a predecir:', 5, 45, 30)
 
+# MODIFICADO: Mas Epochs
 epochs = st.sidebar.slider('Epochs (Entrenamiento):', 1, 50, 15, help="Repeticiones de aprendizaje.")
 
 # Verificar aceleración de hardware
@@ -80,7 +89,7 @@ def get_exchange_rate():
 
 def load_data(ticker):
     try:
-
+        # Descargamos 15 años para asegurar tener suficiente data para look_back grandes
         start = (date.today() - timedelta(days=15*365)).strftime("%Y-%m-%d")
         end = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
         
@@ -96,7 +105,7 @@ def load_data(ticker):
         
         df = df.sort_values('Date')
         
-
+        # Conversión EUR
         rate = get_exchange_rate()
         cols = ['Open', 'High', 'Low', 'Close']
         for c in cols:
@@ -118,7 +127,7 @@ def predict_lstm_tf(data, days_to_predict, look_back_window, num_epochs, num_neu
     x_train, y_train = [], []
     train_len = len(scaled_data)
     
-
+    # Validacion: Si la memoria es mayor que los datos disponibles, ajustamos
     if look_back_window >= train_len:
          look_back_window = int(train_len * 0.5)
     
@@ -135,10 +144,10 @@ def predict_lstm_tf(data, days_to_predict, look_back_window, num_epochs, num_neu
     model = Sequential()
     model.add(Input(shape=(x_train.shape[1], 1)))
     
-    # 1. Capa LSTM
+    # 1. Capa LSTM (Potencia variable segun slider)
     model.add(LSTM(num_neurons, return_sequences=False))
     
-    # 2. Capa Dropout
+    # 2. Capa Dropout (Realismo)
     model.add(Dropout(0.2))
     
     # 3. Capas Densas
@@ -189,7 +198,7 @@ if not data.empty:
     bar = st.progress(0)
     
     try:
-
+        # Pasamos la variable 'neurons' a la funcion
         forecast = predict_lstm_tf(data, prediction_days, look_back, epochs, neurons)
         bar.progress(100)
         status.empty()
@@ -209,7 +218,7 @@ if not data.empty:
     if not forecast.empty and len(forecast) > 0:
         pred_end = forecast['Predicted_Close'].iloc[-1]
         
-
+        # Color dinámico
         trend_color = "normal"
         if pred_end > last_price:
             trend = "ALCISTA"
