@@ -1,10 +1,11 @@
 """
-Dashboard Financiero Profesional
+Dashboard Financiero Profesional v3.9
 -----------------------------------------
 Autor: Evee_
-
-Tech Stack: Streamlit, Yahoo Finance, Prophet, Plotly
-Features: Catálogo de acciones y Modelo Prophet Afinado (Tuned).
+Fixes:
+1. Eliminación de predicciones en fines de semana (causantes de números negativos).
+2. Vuelta al modo 'additive' para evitar caídas irreales.
+3. Clamp de valores negativos (nunca menos de 0).
 """
 
 import streamlit as st
@@ -13,10 +14,11 @@ import yfinance as yf
 from prophet import Prophet
 from plotly import graph_objs as go
 import pandas as pd
+import numpy as np
 
 # 1. Configuración de la página
 st.set_page_config(
-    page_title="AI Stock Vision (EUR)",
+    page_title="AI Stock Vision",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -56,22 +58,23 @@ prediction_months = st.sidebar.slider('Meses a predecir:', 1, 24, 12)
 start_date = date.today() - timedelta(days=n_years * 365)
 start_date_str = start_date.strftime("%Y-%m-%d")
 
-@st.cache_data
 def get_exchange_rate():
     try:
         fx = yf.download("EUR=X", period="1d", progress=False)
         if isinstance(fx.columns, pd.MultiIndex):
             fx.columns = fx.columns.get_level_values(0)
+        if fx.empty: return 1.0
         return fx['Close'].iloc[-1]
     except:
         return 1.0 
 
-@st.cache_data
 def load_data(ticker, start):
     try:
         end_date = date.today() + timedelta(days=1)
         df = yf.download(ticker, start=start, end=end_date.strftime("%Y-%m-%d"), progress=False)
+        
         if df.empty: return df, 1.0
+        
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         df.reset_index(inplace=True)
@@ -79,6 +82,7 @@ def load_data(ticker, start):
             df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
         df = df.sort_values('Date')
         
+        # Conversión a EUROS
         rate = get_exchange_rate()
         cols_to_convert = ['Open', 'High', 'Low', 'Close', 'Adj Close']
         for col in cols_to_convert:
@@ -88,42 +92,52 @@ def load_data(ticker, start):
     except Exception:
         return pd.DataFrame(), 1.0
 
-
-# --- CORRECCIÓN DE LA IA (TUNING) ---
 def generate_forecast(data, months):
-    """Entrena el modelo y genera los datos futuros con parámetros ajustados"""
+    """Genera predicción limpiando fines de semana y valores negativos"""
     df_train = data[['Date', 'Close']].copy()
     df_train = df_train.rename(columns={"Date": "ds", "Close": "y"})
     
-    if len(df_train) < 20:
-        return pd.DataFrame()
-        
+    if len(df_train) < 20: return pd.DataFrame()
+    
+    # Configuración ESTABLE 
     m = Prophet(
         daily_seasonality=False,
         weekly_seasonality=True,
         yearly_seasonality=True,
-        changepoint_prior_scale=0.1,
-        seasonality_mode='multiplicative'
+        changepoint_prior_scale=0.05, 
+        seasonality_mode='additive'
     )
     
     m.fit(df_train)
+    
+    # Creamos futuro
     future = m.make_future_dataframe(periods=months * 30)
+    
+    # --- FILTRO 1: ELIMINAR FINES DE SEMANA ---
+    future['day_of_week'] = future['ds'].dt.dayofweek
+    future = future[future['day_of_week'] < 5] 
+    
     forecast = m.predict(future)
+    
+    # --- FILTRO 2: NO PERMITIR NEGATIVOS ---
+    cols_to_clip = ['yhat', 'yhat_lower', 'yhat_upper']
+    for col in cols_to_clip:
+        forecast[col] = forecast[col].clip(lower=0)
+        
     return forecast
 
 # --- EJECUCIÓN ---
-data_load_state = st.empty()
-data_load_state.text('Descargando datos del mercado...')
+status = st.empty()
+status.text('Descargando datos...')
 
 data, rate_used = load_data(selected_stock, start_date_str)
 
-data_load_state.text('Afinando modelo de IA y calculando...')
-
 forecast = pd.DataFrame()
 if not data.empty:
+    status.text('Calculando predicción (sin fines de semana)...')
     forecast = generate_forecast(data, prediction_months)
 
-data_load_state.empty()
+status.empty()
 
 # 4. Visualización
 if data.empty:
@@ -131,7 +145,6 @@ if data.empty:
 else:
     st.caption(f"Datos en Euros (Tasa: 1 USD = {rate_used:.4f} EUR)")
 
-    # Métricas
     last_close = data['Close'].iloc[-1]
     prev_close = data['Close'].iloc[-2]
     variation = last_close - prev_close
@@ -161,7 +174,7 @@ else:
         st.subheader(f"Proyección Visual a {prediction_months} meses")
         
         if forecast.empty:
-            st.warning("Datos insuficientes para predecir.")
+            st.warning("Datos insuficientes.")
         else:
             fig_pred = go.Figure()
             last_real_date = data['Date'].max()
@@ -199,6 +212,7 @@ else:
             st.subheader("2. Predicción (Futuro)")
             if not forecast.empty:
                 last_real_date = data['Date'].max()
+                # Mostramos tabla solo futuro
                 future_table = forecast[forecast['ds'] > last_real_date][['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
                 future_table = future_table.rename(columns={'ds': 'Fecha', 'yhat': 'Estimado (€)', 'yhat_lower': 'Mínimo (€)', 'yhat_upper': 'Máximo (€)'})
                 st.dataframe(future_table, use_container_width=True)
