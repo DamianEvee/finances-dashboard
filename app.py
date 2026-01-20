@@ -4,7 +4,7 @@ Dashboard Financiero Profesional
 Autor: Evee_
 
 Tech Stack: Streamlit, Yahoo Finance, Prophet, Plotly
-Features: Catálogo de acciones clasificado por sector. Versión limpia.
+Features: Catálogo de acciones y Modelo Prophet Afinado (Tuned).
 """
 
 import streamlit as st
@@ -16,7 +16,7 @@ import pandas as pd
 
 # 1. Configuración de la página
 st.set_page_config(
-    page_title="AI Stock Vision",
+    page_title="AI Stock Vision (EUR)",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -88,15 +88,24 @@ def load_data(ticker, start):
     except Exception:
         return pd.DataFrame(), 1.0
 
+
+# --- CORRECCIÓN DE LA IA (TUNING) ---
 def generate_forecast(data, months):
-    """Entrena el modelo y genera los datos futuros"""
+    """Entrena el modelo y genera los datos futuros con parámetros ajustados"""
     df_train = data[['Date', 'Close']].copy()
     df_train = df_train.rename(columns={"Date": "ds", "Close": "y"})
     
     if len(df_train) < 20:
         return pd.DataFrame()
         
-    m = Prophet()
+    m = Prophet(
+        daily_seasonality=False,
+        weekly_seasonality=True,
+        yearly_seasonality=True,
+        changepoint_prior_scale=0.1,
+        seasonality_mode='multiplicative'
+    )
+    
     m.fit(df_train)
     future = m.make_future_dataframe(periods=months * 30)
     forecast = m.predict(future)
@@ -108,7 +117,7 @@ data_load_state.text('Descargando datos del mercado...')
 
 data, rate_used = load_data(selected_stock, start_date_str)
 
-data_load_state.text('Entrenando Inteligencia Artificial...')
+data_load_state.text('Afinando modelo de IA y calculando...')
 
 forecast = pd.DataFrame()
 if not data.empty:
