@@ -4,7 +4,7 @@ Dashboard Financiero Profesional
 Autor: Evee_
 
 Tech Stack: Streamlit, Yahoo Finance, Prophet, Plotly
-Features: Catálogo de acciones clasificado por sector.
+Features: Catálogo de acciones clasificado por sector. Versión limpia.
 """
 
 import streamlit as st
@@ -16,7 +16,7 @@ import pandas as pd
 
 # 1. Configuración de la página
 st.set_page_config(
-    page_title="AI Stock Vision (EUR)",
+    page_title="AI Stock Vision",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -59,7 +59,7 @@ start_date_str = start_date.strftime("%Y-%m-%d")
 @st.cache_data
 def get_exchange_rate():
     try:
-        fx = yf.download("EUR=X", period="1d")
+        fx = yf.download("EUR=X", period="1d", progress=False)
         if isinstance(fx.columns, pd.MultiIndex):
             fx.columns = fx.columns.get_level_values(0)
         return fx['Close'].iloc[-1]
@@ -70,7 +70,7 @@ def get_exchange_rate():
 def load_data(ticker, start):
     try:
         end_date = date.today() + timedelta(days=1)
-        df = yf.download(ticker, start=start, end=end_date.strftime("%Y-%m-%d"))
+        df = yf.download(ticker, start=start, end=end_date.strftime("%Y-%m-%d"), progress=False)
         if df.empty: return df, 1.0
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
@@ -88,10 +88,8 @@ def load_data(ticker, start):
     except Exception:
         return pd.DataFrame(), 1.0
 
-
 def generate_forecast(data, months):
     """Entrena el modelo y genera los datos futuros"""
-
     df_train = data[['Date', 'Close']].copy()
     df_train = df_train.rename(columns={"Date": "ds", "Close": "y"})
     
@@ -106,15 +104,14 @@ def generate_forecast(data, months):
 
 # --- EJECUCIÓN ---
 data_load_state = st.empty()
-data_load_state.text('⏳ Descargando datos del mercado...')
+data_load_state.text('Descargando datos del mercado...')
 
 data, rate_used = load_data(selected_stock, start_date_str)
 
-data_load_state.text('🧠 Entrenando Inteligencia Artificial (sin caché)...')
+data_load_state.text('Entrenando Inteligencia Artificial...')
 
 forecast = pd.DataFrame()
 if not data.empty:
-
     forecast = generate_forecast(data, prediction_months)
 
 data_load_state.empty()
@@ -123,7 +120,7 @@ data_load_state.empty()
 if data.empty:
     st.error(f"No hay datos para {selected_stock}.")
 else:
-    st.caption(f"ℹ️ Datos en Euros (Tasa: 1 USD = {rate_used:.4f} EUR)")
+    st.caption(f"Datos en Euros (Tasa: 1 USD = {rate_used:.4f} EUR)")
 
     # Métricas
     last_close = data['Close'].iloc[-1]
