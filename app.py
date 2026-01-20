@@ -52,7 +52,7 @@ st.sidebar.subheader("Parámetros de IA")
 n_years = st.sidebar.slider('Años de aprendizaje:', 1, 10, 5)
 prediction_months = st.sidebar.slider('Meses a predecir:', 1, 24, 12)
 
-# 3. Funciones de Carga y Cálculo (Optimizadas)
+# 3. Funciones de Carga
 start_date = date.today() - timedelta(days=n_years * 365)
 start_date_str = start_date.strftime("%Y-%m-%d")
 
@@ -79,7 +79,6 @@ def load_data(ticker, start):
             df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
         df = df.sort_values('Date')
         
-        # Conversión a Euros
         rate = get_exchange_rate()
         cols_to_convert = ['Open', 'High', 'Low', 'Close', 'Adj Close']
         for col in cols_to_convert:
@@ -89,14 +88,13 @@ def load_data(ticker, start):
     except Exception:
         return pd.DataFrame(), 1.0
 
-# NUEVA FUNCIÓN: Generar Predicción (Cacheada para velocidad)
 @st.cache_data
-def generate_forecast(data, months):
+def generate_forecast(data, months, ticker_name):
     """Entrena el modelo y genera los datos futuros"""
     df_train = data[['Date', 'Close']].copy().rename(columns={"Date": "ds", "Close": "y"})
     
     if len(df_train) < 20:
-        return pd.DataFrame() # No hay suficientes datos
+        return pd.DataFrame()
         
     m = Prophet()
     m.fit(df_train)
@@ -108,21 +106,19 @@ def generate_forecast(data, months):
 data_load_state = st.empty()
 data_load_state.text('Cargando datos y entrenando IA...')
 
-# 1. Cargar Histórico
 data, rate_used = load_data(selected_stock, start_date_str)
 
-# 2. Generar Futuro (Si hay datos)
 forecast = pd.DataFrame()
 if not data.empty:
-    forecast = generate_forecast(data, prediction_months)
+    forecast = generate_forecast(data, prediction_months, selected_stock)
 
 data_load_state.empty()
 
-# 4. Visualización Principal
+# 4. Visualización
 if data.empty:
     st.error(f"No hay datos para {selected_stock}.")
 else:
-    st.caption(f"Datos en Euros (Tasa: 1 USD = {rate_used:.4f} EUR)")
+    st.caption(f"ℹ️ Datos en Euros (Tasa: 1 USD = {rate_used:.4f} EUR)")
 
     # Métricas
     last_close = data['Close'].iloc[-1]
@@ -138,10 +134,8 @@ else:
 
     st.markdown("---")
 
-    # Pestañas
     tab1, tab2, tab3 = st.tabs(["Histórico", "Predicción Gráfica", "Datos (Tablas)"])
 
-    # --- PESTAÑA 1: GRÁFICO HISTÓRICO ---
     with tab1:
         st.subheader(f"Evolución Histórica: {selected_stock}")
         fig_hist = go.Figure()
@@ -152,7 +146,6 @@ else:
         fig_hist.update_layout(hovermode="x unified", yaxis_title="Precio (€)")
         st.plotly_chart(fig_hist, use_container_width=True)
 
-    # --- PESTAÑA 2: GRÁFICO PREDICCIÓN ---
     with tab2:
         st.subheader(f"Proyección Visual a {prediction_months} meses")
         
@@ -163,13 +156,11 @@ else:
             last_real_date = data['Date'].max()
             future_only = forecast[forecast['ds'] > last_real_date]
 
-            # 1. Línea Principal
             fig_pred.add_trace(go.Scatter(
                 x=future_only['ds'], y=future_only['yhat'], 
                 name="Predicción IA",
                 line=dict(color='#FF4B4B', width=4)
             ))
-            # 2. Banda de Confianza
             fig_pred.add_trace(go.Scatter(
                 x=future_only['ds'], y=future_only['yhat_upper'],
                 mode='lines', line=dict(width=0), showlegend=False
@@ -187,28 +178,16 @@ else:
             csv = future_only.to_csv(index=False).encode('utf-8')
             st.download_button("Descargar CSV Predicción", csv, f'pred_{selected_stock}_EUR.csv', 'text/csv')
 
-    # --- PESTAÑA 3: DATOS (HISTÓRICO + FUTURO) ---
     with tab3:
-        # Columna 1: Histórico
-        st.subheader("1. Datos Históricos (Reales)")
-        st.dataframe(data[['Date', 'Close', 'Open', 'High', 'Low', 'Volume']].sort_values('Date', ascending=False), use_container_width=True)
+        col_hist, col_fut = st.columns(2)
+        with col_hist:
+            st.subheader("1. Histórico (Real)")
+            st.dataframe(data[['Date', 'Close', 'Open', 'High', 'Low']].sort_values('Date', ascending=False), use_container_width=True)
         
-        st.markdown("---") 
-        
-        # Columna 2: Predicción
-        st.subheader("2. Predicción Datos (Futuro IA)")
-        
-        if not forecast.empty:
-            last_real_date = data['Date'].max()
-            future_table = forecast[forecast['ds'] > last_real_date][['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
-            
-            future_table = future_table.rename(columns={
-                'ds': 'Fecha Futura',
-                'yhat': 'Precio Estimado (€)',
-                'yhat_lower': 'Mínimo (€)',
-                'yhat_upper': 'Máximo (€)'
-            })
-            
-            st.dataframe(future_table, use_container_width=True)
-        else:
-            st.warning("No hay predicciones disponibles.")
+        with col_fut:
+            st.subheader("2. Predicción (Futuro)")
+            if not forecast.empty:
+                last_real_date = data['Date'].max()
+                future_table = forecast[forecast['ds'] > last_real_date][['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
+                future_table = future_table.rename(columns={'ds': 'Fecha', 'yhat': 'Estimado (€)', 'yhat_lower': 'Mínimo (€)', 'yhat_upper': 'Máximo (€)'})
+                st.dataframe(future_table, use_container_width=True)
