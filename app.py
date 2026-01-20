@@ -1,5 +1,5 @@
 """
-Dashboard Financiero v7.2 (TensorFlow/LSTM - Apple Silicon Optimized)
+Dashboard Financiero 
 -----------------------------------------
 Autor: Evee_
 Motor: TensorFlow / Keras (LSTM)
@@ -53,7 +53,7 @@ look_back = st.sidebar.slider('Memoria (Días previos):', 10, 90, 60, help="Día
 prediction_days = st.sidebar.slider('Días a predecir:', 10, 180, 30)
 epochs = st.sidebar.slider('Epochs (Entrenamiento):', 1, 20, 5, help="Más epochs = más preciso, pero más lento.")
 
-# Verificar aceleración de hardware
+
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
     st.sidebar.success(f"🚀 Aceleración GPU Activada: {len(gpus)} dispositivo(s)")
@@ -64,13 +64,23 @@ else:
 def get_exchange_rate():
     try:
         fx = yf.download("EUR=X", period="1d", progress=False)
+        
+
+        if isinstance(fx.columns, pd.MultiIndex):
+            fx.columns = fx.columns.get_level_values(0)
+            
         if fx.empty: return 1.0
-        return fx['Close'].iloc[-1]
+        
+        val = fx['Close'].iloc[-1]
+        
+
+        if hasattr(val, 'item'):
+            return float(val.item())
+        return float(val)
     except: return 1.0
 
 def load_data(ticker):
     try:
-
         start = (date.today() - timedelta(days=10*365)).strftime("%Y-%m-%d")
         end = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
         
@@ -96,9 +106,9 @@ def load_data(ticker):
     except Exception as e:
         return pd.DataFrame(), 1.0
 
-# --- 🧠 CEREBRO TENSORFLOW (LSTM) ---
+# --- CEREBRO TENSORFLOW (LSTM) ---
 def predict_lstm_tf(data, days_to_predict, look_back_window, num_epochs):
-    # 1. Preprocesamiento
+    # Preprocesamiento
     df_close = data.filter(['Close'])
     dataset = df_close.values
     
@@ -107,6 +117,7 @@ def predict_lstm_tf(data, days_to_predict, look_back_window, num_epochs):
     
     x_train, y_train = [], []
     train_len = len(scaled_data)
+
     start_idx = max(look_back_window, train_len - 2000) 
     
     for i in range(start_idx, train_len):
@@ -118,28 +129,26 @@ def predict_lstm_tf(data, days_to_predict, look_back_window, num_epochs):
     # Reshape para LSTM [samples, time steps, features]
     x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
     
-    # 3. Construir la Red Neuronal
+    # Construir la Red Neuronal
     model = Sequential()
     model.add(Input(shape=(x_train.shape[1], 1)))
     model.add(LSTM(50, return_sequences=False))
     model.add(Dense(25)) 
     model.add(Dense(1))
     
-    # 4. Compilar y Entrenar
+    # Compilar y Entrenar
     model.compile(optimizer='adam', loss='mean_squared_error')
     model.fit(x_train, y_train, batch_size=32, epochs=num_epochs, verbose=0)
     
-    # 5. Predicción Recursiva (El futuro se construye paso a paso)
+    # Predicción Recursiva
     last_window_raw = scaled_data[-look_back_window:]
     current_batch = last_window_raw.reshape((1, look_back_window, 1))
     
     predicted_prices = []
     
     for i in range(days_to_predict):
-        # La IA predice el precio de mañana
         current_pred = model.predict(current_batch, verbose=0)[0]
         predicted_prices.append(current_pred)
-        
         current_batch = np.append(current_batch[:,1:,:], [[current_pred]], axis=1)
         
     predicted_prices = scaler.inverse_transform(predicted_prices)
@@ -171,7 +180,6 @@ if not data.empty:
     bar = st.progress(0)
     
     try:
-        # Llamada a la función TensorFlow
         forecast = predict_lstm_tf(data, prediction_days, look_back, epochs)
         bar.progress(100)
         status.empty()
@@ -211,7 +219,6 @@ if not data.empty:
         
         # Predicción
         if not forecast.empty:
-
             last_real_point = pd.DataFrame({'Date': [data['Date'].max()], 'Predicted_Close': [last_price]})
             forecast_plot = pd.concat([last_real_point, forecast])
             
